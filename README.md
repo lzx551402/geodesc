@@ -61,7 +61,7 @@ python image_matching.py --cf_sift
 
 The matching results from SIFT (top) and GeoDesc (bottom) will be displayed. Type `python image_matching.py --h` to view more options and test on your own images.
 
-<p><img src="https://github.com/lzx551402/geodesc/blob/master/img/matching_example.png" alt="sample" width="70%"></p>
+<p><img src="https://github.com/lzx551402/geodesc/blob/master/img/matching_example.jpg" alt="sample" width="70%"></p>
 
 (Image source: Graffiti sequence in [Heinly benchmark](http://cs.unc.edu/~jheinly/binary_descriptors.html))
 
