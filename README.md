@@ -6,6 +6,10 @@ TensorFlow implementation of GeoDesc for ECCV'18 paper ["GeoDesc: Learning Local
 
 We improve the patch cropping implementation and now it gets 5 times faster.
 
+## Update 04/12/2018
+
+Part of the training data is released in [GL3D](https://github.com/lzx551402/GL3D). We will constantly update dataset to help to reproduce the work. Please also cite [MIRorR](https://github.com/hlzz/mirror) if you find this dataset useful for your research.
+
 ## Update 14/08/2018
 
 We have provided an example to test the matching performance of GeoDesc (examples/image_matching.py). See usage below. 
