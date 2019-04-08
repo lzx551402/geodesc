@@ -6,11 +6,7 @@ OpenCV helper.
 
 from __future__ import print_function
 
-from threading import Thread
-from Queue import Queue
-
 import numpy as np
-
 import cv2
 
 
@@ -137,23 +133,23 @@ class SiftWrapper(object):
         scale = 1. / (1 << octave) if octave >= 0 else float(1 << -octave)
         return octave, layer, scale
 
-    def get_interest_region(self, kpt_queue, all_patches, standardize=True):
+    def get_interest_region(self, scale_img, cv_kpts, standardize=True):
         """Get the interest region around a keypoint.
         Args:
-            kpt_queue: A queue to produce keypoint.
-            all_patches: A list of cropped patches.
+            scale_img: DoG image in the scale space.
+            cv_kpts: A list of OpenCV keypoints.
             standardize: (True by default) Whether to standardize patches as network inputs.
         Returns:
             Nothing.
         """
-        while True:
-            idx, cv_kpt = kpt_queue.get()
+        batch_input_grid = []
+        all_patches = []
+        bs = 30  # limited by OpenCV remap implementation 
+        for idx, cv_kpt in enumerate(cv_kpts):
             # preprocess
-            octave, layer, scale = self.unpack_octave(cv_kpt)
+            _, _, scale = self.unpack_octave(cv_kpt)
             size = cv_kpt.size * scale * 0.5
             ptf = (cv_kpt.pt[0] * scale, cv_kpt.pt[1] * scale)
-            scale_img = self.pyr[(int(octave) - self.first_octave) *
-                                 (self.n_octave_layers + 3) + int(layer)]
             ori = (360. - cv_kpt.angle) * (np.pi / 180.)
             radius = np.round(self.sift_descr_scl_fctr * size * np.sqrt(2)
                               * (self.sift_descr_width + 1) * 0.5)
@@ -170,15 +166,27 @@ class SiftWrapper(object):
             affine_mat[2, 1] = ptf[1]
             # get input grid.
             input_grid = np.matmul(self.output_grid, affine_mat)
-            # sample image pixels.
-            patch = cv2.remap(scale_img.astype(np.float32), np.reshape(input_grid, (-1, 1, 2)),
-                              None, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-            patch = np.reshape(patch, (self.patch_size, self.patch_size))
-            # standardize patches.
-            if standardize:
-                patch = (patch - np.mean(patch)) / (np.std(patch) + 1e-8)
-            all_patches[idx] = patch
-            kpt_queue.task_done()
+            input_grid = np.reshape(input_grid, (-1, 1, 2))
+            batch_input_grid.append(input_grid)
+
+            if len(batch_input_grid) != 0 and len(batch_input_grid) % bs == 0 or idx == len(cv_kpts) - 1:
+                # sample image pixels.
+                batch_input_grid_ = np.concatenate(batch_input_grid, axis=0)
+                patches = cv2.remap(scale_img.astype(np.float32), batch_input_grid_,
+                                    None, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+                patches = np.reshape(patches, (len(batch_input_grid),
+                                               self.patch_size, self.patch_size))
+                # standardize patches.
+                if standardize:
+                    patches = (patches - np.mean(patches, axis=(1, 2), keepdims=True)) / \
+                        (np.std(patches, axis=(1, 2), keepdims=True) + 1e-8)
+                all_patches.append(patches)
+                batch_input_grid = []
+        if len(all_patches) != 0:
+            all_patches = np.concatenate(all_patches, axis=0)
+        else:
+            all_patches = None
+        return all_patches
 
     def get_patches(self, cv_kpts):
         """Get all patches around given keypoints.
@@ -196,19 +204,25 @@ class SiftWrapper(object):
             self.output_grid[i, 1] = (i / self.patch_size) * 1. / self.patch_size * 2 - 1
             self.output_grid[i, 2] = 1
 
-        all_patches = [None] * len(cv_kpts)
-        # parallel patch cropping.
-        kpt_queue = Queue()
-        for i in range(4):
-            worker_thread = Thread(target=self.get_interest_region, args=(kpt_queue, all_patches))
-            worker_thread.daemon = True
-            worker_thread.start()
-
+        scale_index = [[] for i in range(len(self.pyr))]
         for idx, val in enumerate(cv_kpts):
-            kpt_queue.put((idx, val))
+            octave, layer, _ = self.unpack_octave(val)
+            scale_val = (int(octave) - self.first_octave) * (self.n_octave_layers + 3) + int(layer)
+            scale_index[scale_val].append(idx)
 
-        kpt_queue.join()
-        all_patches = np.stack(all_patches)
+        all_patches = []
+        for idx, val in enumerate(scale_index):
+            tmp_cv_kpts = [cv_kpts[i] for i in val]
+            scale_img = self.pyr[idx]
+            patches = self.get_interest_region(scale_img, tmp_cv_kpts)
+            if patches is not None:
+                all_patches.append(patches)
+
+        if self.down_octave:
+            all_patches = np.concatenate(all_patches[::-1], axis=0)
+        else:
+            all_patches = np.concatenate(all_patches, axis=0)
+        assert len(cv_kpts) == all_patches.shape[0]
         return all_patches
 
 

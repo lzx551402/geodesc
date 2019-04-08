@@ -2,6 +2,10 @@
 
 TensorFlow implementation of GeoDesc for ECCV'18 paper ["GeoDesc: Learning Local Descriptors by Integrating Geometry Constraints"](https://arxiv.org/abs/1807.06294), Zixin Luo, Tianwei Shen, Lei Zhou, Siyu Zhu, Runze Zhang, Yao Yao, Tian Fang and Long Quan.
 
+## Update 08/04/2019
+
+We improve the patch cropping implementation and now it gets 5 times faster.
+
 ## Update 14/08/2018
 
 We have provided an example to test the matching performance of GeoDesc (examples/image_matching.py). See usage below. 
