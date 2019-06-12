@@ -6,9 +6,9 @@ TensorFlow implementation of GeoDesc for ECCV'18 paper ["GeoDesc: Learning Local
 
 Add three options (`--pyr_off, --ori_off, --half_sigma`) to help to better understand the performance. You may use the new test pair (`test_img3.png, test_img4.png`) to validate their influence.
 
-`--pyr_off` (False by default): disable the pyramid construction, which boosts the performance when scale change is not significant.
+`--pyr_off` (False by default): disable the pyramid construction so as to sample patches from the original image, which boosts the performance when scale change is not significant.
 
-`--ori_off` (False by default): disable the orientation estimation by SIFT, which boosts the performance the rotation change is not significant.
+`--ori_off` (False by default): disable the orientation estimation by SIFT, which boosts the performance when the rotation change is not significant.
 
 `--half_sigma` (True by default): halve the sigma value in pyramid construction, which empirically boosts the performance.
 
