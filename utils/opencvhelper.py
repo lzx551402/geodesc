@@ -26,7 +26,7 @@ class SiftWrapper(object):
         self.n_sample = n_sample
         self.down_octave = True
 
-        self.sift_init_sigma = 0.5
+        self.init_sigma = 0.5
         self.sift_descr_scl_fctr = 3.
         self.sift_descr_width = 4
 
@@ -36,6 +36,10 @@ class SiftWrapper(object):
 
         self.patch_size = patch_size
         self.output_gird = None
+
+        self.pyr_off = False
+        self.ori_off = False
+        self.half_sigma = True
 
     def create(self):
         """Create OpenCV SIFT detector."""
@@ -73,49 +77,56 @@ class SiftWrapper(object):
         return sift_desc
 
     def build_pyramid(self, gray_img):
-        """Build pyramid. It would be more efficient to use the pyramid 
-        constructed in the detection step.
+        """Build pyramid.
         Args:
             gray_img: Input gray-scale image.
         Returns:
             pyr: A list of gaussian blurred images (gaussian scale space).
         """
-
-        gray_img = gray_img.astype(np.float32)
-        n_octaves = self.max_octave - self.first_octave + 1
-        # create initial image.
-        if self.first_octave < 0:
-            sig_diff = np.sqrt(np.maximum(
-                np.square(self.sigma) - np.square(self.sift_init_sigma) * 4, 0.01))
-            base = cv2.resize(gray_img, (gray_img.shape[1] * 2, gray_img.shape[0] * 2),
-                              interpolation=cv2.INTER_LINEAR)
-            base = cv2.GaussianBlur(base, None, sig_diff)
+        if self.pyr_off:
+            self.pyr = gray_img
         else:
-            sig_diff = np.sqrt(np.maximum(np.square(self.sigma) -
-                                          np.square(self.sift_init_sigma), 0.01))
-            base = cv2.GaussianBlur(gray_img, None, sig_diff)
-        # compute gaussian kernels.
-        sig = np.zeros((self.n_octave_layers + 3,))
-        self.pyr = [None] * (n_octaves * (self.n_octave_layers + 3))
-        sig[0] = self.sigma
-        k = np.power(2, 1. / self.n_octave_layers)
-        for i in range(1, self.n_octave_layers + 3):
-            sig_prev = np.power(k, i - 1) * self.sigma
-            sig_total = sig_prev * k
-            sig[i] = np.sqrt(sig_total * sig_total - sig_prev * sig_prev)
-        # construct gaussian scale space.
-        for o in range(0, n_octaves):
-            for i in range(0, self.n_octave_layers + 3):
-                if o == 0 and i == 0:
-                    dst = base
-                elif i == 0:
-                    src = self.pyr[(o - 1) * (self.n_octave_layers + 3) + self.n_octave_layers]
-                    dst = cv2.resize(
-                        src, (src.shape[1] / 2, src.shape[0] / 2), interpolation=cv2.INTER_NEAREST)
-                else:
-                    src = self.pyr[o * (self.n_octave_layers + 3) + i - 1]
-                    dst = cv2.GaussianBlur(src, None, sig[i])
-                self.pyr[o * (self.n_octave_layers + 3) + i] = dst
+            sigma = self.sigma
+            init_sigma = self.init_sigma
+            if self.half_sigma:
+                sigma /= 2
+                init_sigma /= 2
+
+            gray_img = gray_img.astype(np.float32)
+            n_octaves = self.max_octave - self.first_octave + 1
+            # create initial image.
+            if self.first_octave < 0:
+                sig_diff = np.sqrt(np.maximum(
+                    np.square(sigma) - np.square(init_sigma) * 4, 0.01))
+                base = cv2.resize(gray_img, (gray_img.shape[1] * 2, gray_img.shape[0] * 2),
+                                  interpolation=cv2.INTER_LINEAR)
+                base = cv2.GaussianBlur(base, None, sig_diff)
+            else:
+                sig_diff = np.sqrt(np.maximum(np.square(sigma) -
+                                              np.square(init_sigma), 0.01))
+                base = cv2.GaussianBlur(gray_img, None, sig_diff)
+            # compute gaussian kernels.
+            sig = np.zeros((self.n_octave_layers + 3,))
+            self.pyr = [None] * (n_octaves * (self.n_octave_layers + 3))
+            sig[0] = sigma
+            k = np.power(2, 1. / self.n_octave_layers)
+            for i in range(1, self.n_octave_layers + 3):
+                sig_prev = np.power(k, i - 1) * sigma
+                sig_total = sig_prev * k
+                sig[i] = np.sqrt(sig_total * sig_total - sig_prev * sig_prev)
+            # construct gaussian scale space.
+            for o in range(0, n_octaves):
+                for i in range(0, self.n_octave_layers + 1):
+                    if o == 0 and i == 0:
+                        dst = base
+                    elif i == 0:
+                        src = self.pyr[(o - 1) * (self.n_octave_layers + 3) + self.n_octave_layers]
+                        dst = cv2.resize(
+                            src, (src.shape[1] // 2, src.shape[0] // 2), interpolation=cv2.INTER_NEAREST)
+                    else:
+                        src = self.pyr[o * (self.n_octave_layers + 3) + i - 1]
+                        dst = cv2.GaussianBlur(src, None, sig[i])
+                    self.pyr[o * (self.n_octave_layers + 3) + i] = dst
 
     def unpack_octave(self, kpt):
         """Get scale coefficients of a keypoints.
@@ -144,13 +155,16 @@ class SiftWrapper(object):
         """
         batch_input_grid = []
         all_patches = []
-        bs = 30  # limited by OpenCV remap implementation 
+        bs = 30  # limited by OpenCV remap implementation
         for idx, cv_kpt in enumerate(cv_kpts):
             # preprocess
-            _, _, scale = self.unpack_octave(cv_kpt)
+            if self.pyr_off:
+                scale = 1
+            else:
+                _, _, scale = self.unpack_octave(cv_kpt)
             size = cv_kpt.size * scale * 0.5
             ptf = (cv_kpt.pt[0] * scale, cv_kpt.pt[1] * scale)
-            ori = (360. - cv_kpt.angle) * (np.pi / 180.)
+            ori = 0 if self.ori_off else (360. - cv_kpt.angle) * (np.pi / 180.)
             radius = np.round(self.sift_descr_scl_fctr * size * np.sqrt(2)
                               * (self.sift_descr_width + 1) * 0.5)
             radius = np.minimum(radius, np.sqrt(np.sum(np.square(scale_img.shape))))
@@ -204,24 +218,29 @@ class SiftWrapper(object):
             self.output_grid[i, 1] = (i / self.patch_size) * 1. / self.patch_size * 2 - 1
             self.output_grid[i, 2] = 1
 
-        scale_index = [[] for i in range(len(self.pyr))]
-        for idx, val in enumerate(cv_kpts):
-            octave, layer, _ = self.unpack_octave(val)
-            scale_val = (int(octave) - self.first_octave) * (self.n_octave_layers + 3) + int(layer)
-            scale_index[scale_val].append(idx)
-
-        all_patches = []
-        for idx, val in enumerate(scale_index):
-            tmp_cv_kpts = [cv_kpts[i] for i in val]
-            scale_img = self.pyr[idx]
-            patches = self.get_interest_region(scale_img, tmp_cv_kpts)
-            if patches is not None:
-                all_patches.append(patches)
-
-        if self.down_octave:
-            all_patches = np.concatenate(all_patches[::-1], axis=0)
+        if self.pyr_off:
+            if not self.down_octave:
+                cv_kpts = cv_kpts[::-1]
+            all_patches = self.get_interest_region(self.pyr, cv_kpts)
         else:
-            all_patches = np.concatenate(all_patches, axis=0)
+            scale_index = [[] for i in range(len(self.pyr))]
+            for idx, val in enumerate(cv_kpts):
+                octave, layer, _ = self.unpack_octave(val)
+                scale_val = (int(octave) - self.first_octave) * (self.n_octave_layers + 3) + int(layer)
+                scale_index[scale_val].append(idx)
+
+            all_patches = []
+            for idx, val in enumerate(scale_index):
+                tmp_cv_kpts = [cv_kpts[i] for i in val]
+                scale_img = self.pyr[idx]
+                patches = self.get_interest_region(scale_img, tmp_cv_kpts)
+                if patches is not None:
+                    all_patches.append(patches)
+            if self.down_octave:
+                all_patches = np.concatenate(all_patches[::-1], axis=0)
+            else:
+                all_patches = np.concatenate(all_patches, axis=0)
+
         assert len(cv_kpts) == all_patches.shape[0]
         return all_patches
 

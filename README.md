@@ -2,6 +2,18 @@
 
 TensorFlow implementation of GeoDesc for ECCV'18 paper ["GeoDesc: Learning Local Descriptors by Integrating Geometry Constraints"](https://arxiv.org/abs/1807.06294), Zixin Luo, Tianwei Shen, Lei Zhou, Siyu Zhu, Runze Zhang, Yao Yao, Tian Fang and Long Quan.
 
+## Update 12/05/2019
+
+Add three options (`--pyr_off, --ori_off, --half_sigma`) to help to better understand the performance. You may use the new test pair (`test_img3.png, test_img4.png`) to validate their influence.
+
+`--pyr_off` (False by default): disable the pyramid construction, which boosts the performance when scale change is not significant.
+
+`--ori_off` (False by default): disable the orientation estimation by SIFT, which boosts the performance the rotation change is not significant.
+
+`--half_sigma` (True by default): halve the sigma value in pyramid construction, which empirically boosts the performance.
+
+Some recent findings about GeoDesc: as described in the paper, we trained GeoDesc with random rotations up to 90°. Different from the setting in [HardNet](https://github.com/DagnyT/hardnet), we perturbed each training patch *individually* by a random angle uniformly sampled over [-90°, 90°], which leaded to a maximum of 180° rotation difference for an input patch pair. We have found such augmentation helped to acquire stronger rotational invariance, which is important in our target applications, i.e., 3D reconstruction from aerial images. However, in general cases where images are upright-aligned regarding their EXIF orientations, training with smaller rotation perturbation will give notably better performance.
+
 ## Update 08/04/2019
 
 We improve the patch cropping implementation and now it gets 5 times faster.

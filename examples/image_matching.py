@@ -37,6 +37,13 @@ tf.app.flags.DEFINE_string('img2_path', '../img/test_img2.png',
                            """Path to the second image.""")
 tf.app.flags.DEFINE_boolean('cf_sift', False,
                             """Compare with SIFT feature.""")
+# SIFT options
+tf.app.flags.DEFINE_boolean('pyr_off', False,
+                            """Whether to construct image pyramid.""")
+tf.app.flags.DEFINE_boolean('half_sigma', True,
+                            """Whether to halve the sigma value of SIFT when constructing the pyramid.""")
+tf.app.flags.DEFINE_boolean('ori_off', False,
+                            """Whether to use the orientation estimated from SIFT.""")
 
 
 def extract_deep_features(sift_wrapper, sess, img_path, qtz=True):
@@ -107,6 +114,9 @@ def main(argv=None):  # pylint: disable=unused-argument
     """Program entrance."""
     # create sift detector.
     sift_wrapper = SiftWrapper(n_sample=FLAGS.max_kpt_num)
+    sift_wrapper.half_sigma = FLAGS.half_sigma
+    sift_wrapper.pyr_off = FLAGS.pyr_off
+    sift_wrapper.ori_off = FLAGS.ori_off
     sift_wrapper.create()
     # create deep feature extractor.
     graph = load_frozen_model(FLAGS.model_path, print_nodes=False)
