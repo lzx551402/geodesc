@@ -215,7 +215,7 @@ class SiftWrapper(object):
         self.output_grid = np.zeros((n_pixel, 3), dtype=np.float32)
         for i in range(n_pixel):
             self.output_grid[i, 0] = (i % self.patch_size) * 1. / self.patch_size * 2 - 1
-            self.output_grid[i, 1] = (i / self.patch_size) * 1. / self.patch_size * 2 - 1
+            self.output_grid[i, 1] = (i // self.patch_size) * 1. / self.patch_size * 2 - 1
             self.output_grid[i, 2] = 1
 
         if self.pyr_off:
@@ -251,13 +251,14 @@ class MatcherWrapper(object):
     def __init__(self):
         self.matcher = cv2.BFMatcher(cv2.NORM_L2)
 
-    def get_matches(self, feat1, feat2, cv_kpts1, cv_kpts2, ratio=None, cross_check=True, info=''):
+    def get_matches(self, feat1, feat2, cv_kpts1, cv_kpts2, ratio=None, cross_check=True, err_thld=4, info=''):
         """Compute putative and inlier matches.
         Args:
             feat: (n_kpts, 128) Local features.
             cv_kpts: A list of keypoints represented as cv2.KeyPoint.
             ratio: The threshold to apply ratio test.
             cross_check: (True by default) Whether to apply cross check.
+            err_thld: Epipolar error threshold.
             info: Info to print out.
         Returns:
             good_matches: Putative matches.
@@ -270,20 +271,27 @@ class MatcherWrapper(object):
         good_matches = []
 
         for i in range(len(init_matches1)):
-            # cross check
-            if cross_check and init_matches2[init_matches1[i][0].trainIdx][0].trainIdx == i:
-                # ratio test
-                if ratio is not None and init_matches1[i][0].distance <= ratio * init_matches1[i][1].distance:
+            cond = True
+            if cross_check:
+                cond1 = cross_check and init_matches2[init_matches1[i][0].trainIdx][0].trainIdx == i
+                cond *= cond1
+            if ratio is not None:
+                cond2 = init_matches1[i][0].distance <= ratio * init_matches1[i][1].distance
+                cond *= cond2
+            if cond:
                     good_matches.append(init_matches1[i][0])
-                elif ratio is None:
-                    good_matches.append(init_matches1[i][0])
-            elif not cross_check:
-                good_matches.append(init_matches1[i][0])
 
-        good_kpts1 = np.array([cv_kpts1[m.queryIdx].pt for m in good_matches])
-        good_kpts2 = np.array([cv_kpts2[m.trainIdx].pt for m in good_matches])
+        if type(cv_kpts1) is list and type(cv_kpts2) is list:
+            good_kpts1 = np.array([cv_kpts1[m.queryIdx].pt for m in good_matches])
+            good_kpts2 = np.array([cv_kpts2[m.trainIdx].pt for m in good_matches])
+        elif type(cv_kpts1) is np.ndarray and type(cv_kpts2) is np.ndarray:
+            good_kpts1 = np.array([cv_kpts1[m.queryIdx] for m in good_matches])
+            good_kpts2 = np.array([cv_kpts2[m.trainIdx] for m in good_matches])
+        else:
+            raise Exception("Keypoint type error!")
+            exit(-1)
 
-        _, mask = cv2.findFundamentalMat(good_kpts1, good_kpts2, cv2.RANSAC, 4.0, confidence=0.999)
+        _, mask = cv2.findFundamentalMat(good_kpts1, good_kpts2, cv2.RANSAC, err_thld, confidence=0.999)
         n_inlier = np.count_nonzero(mask)
         print(info, 'n_putative', len(good_matches), 'n_inlier', n_inlier)
         return good_matches, mask
@@ -291,6 +299,11 @@ class MatcherWrapper(object):
     def draw_matches(self, img1, cv_kpts1, img2, cv_kpts2, good_matches, mask,
                      match_color=(0, 255, 0), pt_color=(0, 0, 255)):
         """Draw matches."""
+        if type(cv_kpts1) is np.ndarray and type(cv_kpts2) is np.ndarray:
+            cv_kpts1 = [cv2.KeyPoint(cv_kpts1[i][0], cv_kpts1[i][1], 1)
+                        for i in range(cv_kpts1.shape[0])]
+            cv_kpts2 = [cv2.KeyPoint(cv_kpts2[i][0], cv_kpts2[i][1], 1)
+                        for i in range(cv_kpts2.shape[0])]
         display = cv2.drawMatches(img1, cv_kpts1, img2, cv_kpts2, good_matches,
                                   None,
                                   matchColor=match_color,
