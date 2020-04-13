@@ -2,6 +2,10 @@
 
 TensorFlow implementation of GeoDesc for ECCV'18 paper ["GeoDesc: Learning Local Descriptors by Integrating Geometry Constraints"](https://arxiv.org/abs/1807.06294), Zixin Luo, Tianwei Shen, Lei Zhou, Siyu Zhu, Runze Zhang, Yao Yao, Tian Fang and Long Quan.
 
+## Update 4/13/2020
+
+The training code is released in a separate project, [TFMatch](https://github.com/lzx551402/tfmatch), which also contains two follow-up works ([ContextDesc](https://github.com/lzx551402/contextdesc), CVPR'19 and [ASLFeat](https://github.com/lzx551402/ASLFeat), CVPR'20).
+
 ## Update 12/05/2019
 
 Add three options (`--pyr_off, --ori_off, --half_sigma`) to help to better understand the performance. You may use the new test pair (`test_img3.png, test_img4.png`) to validate their influence.
