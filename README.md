@@ -2,6 +2,10 @@
 
 TensorFlow implementation of GeoDesc for ECCV'18 paper ["GeoDesc: Learning Local Descriptors by Integrating Geometry Constraints"](https://arxiv.org/abs/1807.06294), Zixin Luo, Tianwei Shen, Lei Zhou, Siyu Zhu, Runze Zhang, Yao Yao, Tian Fang and Long Quan.
 
+## Update 6/6/2021
+
+Fix broken link to pretrained model.
+
 ## Update 4/13/2020
 
 The training code is released in a separate project, [TFMatch](https://github.com/lzx551402/tfmatch), which also contains two follow-up works ([ContextDesc](https://github.com/lzx551402/contextdesc), CVPR'19 and [ASLFeat](https://github.com/lzx551402/ASLFeat), CVPR'20).
@@ -36,9 +40,9 @@ Please use Python 2.7, install NumPy, OpenCV and TensorFlow. To run the image ma
 
 ## Pre-trained model
 
-Pre-trained GeoDesc model (in TensorFlow Protobuf format) can be found [here](http://home.cse.ust.hk/~zluoag/data/geodesc.pb).
+Pre-trained GeoDesc model (in TensorFlow Protobuf format) can be found [here](https://github.com/lzx551402/geodesc/blob/master/model/geodesc.pb).
 
-Model in NumPy dictionary is available [here](http://home.cse.ust.hk/~zluoag/data/geodesc.npy), which is more handy to be converted to other formats.
+~~Model in NumPy dictionary is available [here](http://home.cse.ust.hk/~zluoag/data/geodesc.npy), which is more handy to be converted to other formats.~~
 
 ## Example scripts
 
