@@ -54,8 +54,6 @@ After download HPatches, you can start to evaluate GeoDesc:
 
 ```bash
 git clone https://github.com/lzx551402/geodesc.git
-cd geodesc/model
-wget http://home.cse.ust.hk/~zluoag/data/geodesc.pb
 cd ../examples
 python extract_features_of_hpatches.py \
     --hpatches_root=<hpatches_benchmark>/data/hpatches-release \
